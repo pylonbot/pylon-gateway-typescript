@@ -1,0 +1,15 @@
+{
+  "name": "@pylonbot/pylon-gateway-typescript",
+  "version": "0.0.1",
+  "description": "Pylon Gateway Typescript Client Library",
+  "scripts": {
+    "tsc": "tsc"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@grpc/grpc-js": "^1.2.12",
+    "@pylonbot/pylon-gateway-protobuf": "https://github.com/pylonbot/pylon-gateway-protobuf-typescript",
+    "typescript": "^4.2.4"
+  }
+}
