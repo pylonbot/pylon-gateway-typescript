@@ -9,7 +9,7 @@
   "license": "MIT",
   "dependencies": {
     "@grpc/grpc-js": "^1.2.12",
-    "@pylonbot/pylon-gateway-protobuf": "https://github.com/pylonbot/pylon-gateway-protobuf-typescript",
+    "@pylonbot/pylon-gateway-protobuf": "https://github.com/pylonbot/pylon-gateway-protobuf-typescript#fcb2eed99f8a07d5da18fc1461276c367a790502",
     "typescript": "^4.2.4"
   }
 }
