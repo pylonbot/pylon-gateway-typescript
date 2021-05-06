@@ -60,17 +60,28 @@ export class WorkerGroupClient {
     // you can call .add() multiple times per key
     meta.add("x-pylon-shard-key", "000000000000000-0-1");
 
-    meta.add("x-pylon-event-types", "MESSAGE_CREATE");
+    [
+      "MESSAGE_CREATE",
+      "MESSAGE_UPDATE",
+      "MESSAGE_DELETE",
+      "GUILD_MEMBER_ADD",
+      "GUILD_MEMBER_UPDATE",
+      "GUILD_MEMBER_REMOVE",
+      "CHANNEL_CREATE",
+      "CHANNEL_UPDATE",
+      "CHANNEL_DELETE",
+    ].forEach((event) => meta.add("x-pylon-event-types", event));
 
     const stream = this.client.workerStream(meta);
     this.stream = stream;
 
     stream.once("close", () => {
-      console.log("stream closed... reconnecting in 5s");
       this.stream = undefined;
       if (this.drainResolve) {
         this.drainResolve();
+        return;
       }
+      console.warn("stream disconnected ... reconnecting in 5s");
       setTimeout(() => {
         this.connect();
       }, 5000);
@@ -100,8 +111,21 @@ export class WorkerGroupClient {
             `received graceful close: ${data.payload.streamClosed.reason}`
           );
           stream.destroy();
-        default:
-          console.log(`unhandled server message: ${data.payload?.$case}`);
+          break;
+        case "heartbeatRequest":
+          const { nonce } = data.payload.heartbeatRequest;
+          stream.write(
+            WorkerStreamClientMessage.fromPartial({
+              payload: {
+                $case: "heartbeatAck",
+                heartbeatAck: {
+                  nonce,
+                  sequence: this.sequence,
+                },
+              },
+            })
+          );
+          break;
       }
     });
 
@@ -112,6 +136,7 @@ export class WorkerGroupClient {
           $case: "identifyRequest",
           identifyRequest: {
             authToken: "noauth", // todo: read params from connection string
+            lastSequence: this.sequence,
             consumerGroup: this.consumerGroup,
             consumerId: this.consumerId,
           },
@@ -121,7 +146,7 @@ export class WorkerGroupClient {
   }
 
   private installSignalHandler() {
-    process.on("SIGTERM", async () => {
+    const exitHandler = async () => {
       console.info(
         "received SIGTERM signal, draining + waiting 30s for shutdown"
       );
@@ -129,10 +154,12 @@ export class WorkerGroupClient {
         console.warn("waited 30s, shutting down");
         process.exit(1);
       }, 30000);
-
       await this.drain();
-
       process.exit(0);
+    };
+
+    ["SIGTERM", "SIGINT", "SIGHUP"].forEach((signal) => {
+      process.on(signal, exitHandler);
     });
   }
 
@@ -143,9 +170,8 @@ export class WorkerGroupClient {
     }
 
     this.drained = true;
-    const seq = this.sequence || 0;
 
-    console.info(`draining stream, sequence: ${seq}`);
+    console.info(`draining stream, sequence: ${this.sequence}`);
 
     const drainPromise = new Promise((r) => (this.drainResolve = r));
     this.stream.write(
@@ -153,7 +179,7 @@ export class WorkerGroupClient {
         payload: {
           $case: "drainRequest",
           drainRequest: {
-            sequence: `${seq}`,
+            sequence: this.sequence,
           },
         },
       })
